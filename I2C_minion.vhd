@@ -28,7 +28,8 @@ entity I2C_minion is
     read_req         : out   std_logic;
     data_to_master   : in    std_logic_vector(7 downto 0);
     data_valid       : out   std_logic;
-    data_from_master : out   std_logic_vector(7 downto 0));
+    data_from_master : out   std_logic_vector(7 downto 0);
+    stop             : out   std_logic);
 end entity I2C_minion;
 ------------------------------------------------------------
 architecture arch of I2C_minion is
@@ -42,8 +43,8 @@ architecture arch of I2C_minion is
   signal bits_processed_reg : integer range 0 to 8 := 0;
   signal continue_reg       : std_logic            := '0';
 
-  signal scl_reg       : std_logic := 'Z';
-  signal sda_reg       : std_logic := 'Z';
+  --signal scl_reg       : std_logic := 'Z';
+  --signal sda_reg       : std_logic := 'Z';
   signal scl_debounced : std_logic := 'Z';
   signal sda_debounced : std_logic := 'Z';
 
@@ -78,6 +79,11 @@ architecture arch of I2C_minion is
   signal data_to_master_reg : std_logic_vector(7 downto 0) := (others => '0');
 begin
 
+  stop <= stop_reg;
+
+  scl_wen_reg <= '0';
+  scl_o_reg <= '0';
+    
   debounce : if USE_INPUT_DEBOUNCING generate
     -- debounce SCL and SDA
     SCL_debounce : entity work.debounce
@@ -85,6 +91,7 @@ begin
         WAIT_CYCLES => DEBOUNCING_WAIT_CYCLES)
       port map (
         clk        => clk,
+        rst        => rst,
         signal_in  => scl,
         signal_out => scl_debounced);
 
@@ -95,10 +102,11 @@ begin
         WAIT_CYCLES => DEBOUNCING_WAIT_CYCLES)
       port map (
         clk        => clk,
+        rst        => rst,
         signal_in  => sda,
         signal_out => sda_debounced);
 
-    scl_pre_internal     <= scl_debounced;
+    scl_pre_internal <= scl_debounced;
     sda_pre_internal <= sda_debounced;
   end generate debounce;
 
@@ -106,7 +114,7 @@ begin
     process (clk) is
     begin
       if rising_edge(clk) then
-        scl_pre_internal     <= scl;
+        scl_pre_internal <= scl;
         sda_pre_internal <= sda;
       end if;
     end process;
@@ -315,8 +323,11 @@ begin
   ----------------------------------------------------------
   -- I2C interface
   ----------------------------------------------------------
-  sda <= sda_o_reg when sda_wen_reg = '1' else
-         'Z';
+  --sda <= sda_o_reg when sda_wen_reg = '1' else 'Z';
+  sda <= 'Z' when rst = '1' else
+          sda_o_reg when sda_wen_reg = '1' else 
+          'Z';
+  
   scl <= scl_o_reg when scl_wen_reg = '1' else
          'Z';
   ----------------------------------------------------------
